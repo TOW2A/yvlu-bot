@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-yvlu-bot",
   "description": "记录语录的机器人插件",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "contributors": [
     "TOW2A <towava@outlook.com>"
   ],

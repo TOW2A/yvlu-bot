@@ -77,19 +77,17 @@ export async function apply(ctx: Context, config: Config) {
       await client.makeBucket(config.bucket)
     }
   })
-  ctx.command('语录 <name:text> ', "群友语录").action(async ({ session }, name) => {
-    if (name === "") {
-      return "请输入name"
-    }
-    const result = await ctx.database.get('quote', { author: name }, ["content_url"])
+  ctx.command('语录 [name:text] ', "群友语录").action(async ({ session }, name) => {
     if (!session) return "error"
-    if (result.length === 0) {
-      return "没有找到相关语录"
-    }
-    await session.send(h('img', { src: result[Math.floor(Math.random() * result.length)].content_url }))
+    const result = await ctx.database.get(
+      'quote',
+      name ? { author: name } : {},
+      ['content_url']
+    )
+    await session.send(result.length === 0 ? "没有找到相关语录" : h('img', { src: result[Math.floor(Math.random() * result.length)].content_url }))
   })
 
-  ctx.command('语录.上传 <name:text> <image:image>').action(async ({ session }, name, image) => {
+  ctx.command('语录/上传语录 <name:text> <image:image>').action(async ({ session }, name, image) => {
     //* 在这里获取img,因为不知道为什么\n会截断解析,所以用手动获取的方法
     if (!session?.event?.message?.elements) return "error"
     const img = session.event.message.elements.find(
@@ -97,7 +95,14 @@ export async function apply(ctx: Context, config: Config) {
     )
     const src = img?.attrs.src
     //* 在这里判断参数输入
-    if (name === "") {
+    if (!session?.elements) return "error"
+    const author = session.elements
+      .filter(e => e.type === 'text')
+      .map(e => e.attrs.content)
+      .join('')
+      .replace(/^上传语录\s*/, '')
+      .trim();
+    if (author === "") {
       return "请输入name"
     } else if (!src) {
       return '请发送一张图片'
@@ -107,7 +112,7 @@ export async function apply(ctx: Context, config: Config) {
     const buffer = Buffer.from(await response.arrayBuffer())
     const hash = await imghash.hash(buffer);
     //* 这里从数据库中存取一次dHash,然后判断存不存在
-    const result = await ctx.database.get('quote', { hash: hash }, ['id'])
+    const result = await ctx.database.get('quote', { author: author, hash: hash }, ['id'])
     if (result.length) {
       return "图片已存在"
     }
@@ -124,11 +129,13 @@ export async function apply(ctx: Context, config: Config) {
     const url = `https://${config.endPoint}:${config.endPort}/${config.bucket}/${fileName}`
     await ctx.database.create('quote', {
       content_url: url,
-      author: name,
+      author: author,
       createdAt: new Date(),
       hash: hash,
     })
-    return "上传成功"
+    const id = await ctx.database.get('quote', { author: author, hash: hash }, ['id'])
+
+    return `上传成功 ID:${id[0]?.id}`
   })
 
 }
